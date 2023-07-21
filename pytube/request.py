@@ -10,6 +10,7 @@ from functools import lru_cache
 from urllib import parse
 from urllib.error import URLError
 from urllib.request import Request, urlopen
+from retry import retry
 
 from pytube.exceptions import RegexMatchError, MaxRetriesExceeded
 from pytube.helpers import regex_search
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 default_range_size = 9437184  # 9MB
 
 
+@retry((http.client.HTTPException, urllib.error.URLError, socket.timeout), tries=10, delay=1, backoff=2, max_delay=60)
 def _execute_request(
     url,
     method=None,
@@ -36,18 +38,7 @@ def _execute_request(
         request = Request(url, headers=base_headers, method=method, data=data)
     else:
         raise ValueError("Invalid URL")
-    retry = 5
-    while True:
-        try:
-            return urlopen(request, timeout=timeout)  # nosec
-        except (http.client.HTTPException, urllib.error.URLError, socket.timeout) as e:
-            if retry > 0:
-                retry -= 1
-                logger.warning(f"Retry {retry} {url}")
-                time.sleep(10)
-                continue
-            raise e
-
+    return urlopen(request, timeout=timeout)  # nosec
 
 def get(url, extra_headers=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
     """Send an http GET request.

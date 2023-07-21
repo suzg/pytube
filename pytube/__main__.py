@@ -9,6 +9,7 @@ smaller peripheral modules and functions.
 import logging
 from typing import Any, Callable, Dict, List, Optional
 import socket
+from retry import retry
 
 import pytube
 import pytube.exceptions as exceptions
@@ -97,20 +98,11 @@ class YouTube:
         return type(o) == type(self) and o.watch_url == self.watch_url
 
     @property
+    @retry(socket.timeout, tries=10, delay=1, backoff=2, max_delay=60)
     def watch_html(self):
         if self._watch_html:
             return self._watch_html
-        retry = 5
-        while True:
-            try:
-                self._watch_html = request.get(url=self.watch_url)
-                break
-            except socket.timeout as e:
-                if retry > 0:
-                    retry -= 1
-                    logger.warning(f"retry {retry} {e}")
-                else:
-                    raise e
+        self._watch_html = request.get(url=self.watch_url)
         return self._watch_html
 
     @property

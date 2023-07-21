@@ -5,6 +5,7 @@ import urllib.error
 from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Dict, Iterable, List, Optional, Tuple, Union
+from retry.api import retry_call
 
 from pytube import extract, request, YouTube
 from pytube.helpers import cache, DeferredGeneratorList, install_proxy, uniqueify
@@ -140,16 +141,13 @@ class Playlist(Sequence):
             logger.debug("load more url: %s", load_more_url)
             # requesting the next page of videos with the url generated from the
             # previous page, needs to be a post
-            retry = 5
-            while True:
-                try:
-                    req = request.post(load_more_url, extra_headers=headers, data=data)
-                    break
-                except urllib.error.URLError as e:
-                    retry -= 1
-                    if retry == 0:
-                        raise e
-                    logger.debug("retrying request, %d attempts left", retry)
+            req = retry_call(request.post,
+                             fargs=[load_more_url],
+                             fkwargs=dict(extra_headers=headers, data=data),
+                             tries=10,
+                             delay=1,
+                             backoff=2,
+                             max_delay=60)
                     
             # extract up to 100 songs from the page loaded
             # returns another continuation if more videos are available

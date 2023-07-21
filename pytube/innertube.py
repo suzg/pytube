@@ -12,6 +12,7 @@ import pathlib
 import time
 from urllib import parse
 import urllib.error
+from retry import retry
 
 # Local imports
 from pytube import request
@@ -370,6 +371,7 @@ class InnerTube:
             'racyCheckOk': True
         }
 
+    @retry(urllib.error.URLError, tries=10, delay=1, backoff=2, max_delay=60)
     def _call_api(self, endpoint, query, data):
         """Make a request to a given endpoint with the provided query parameters and data."""
         # Remove the API key if oauth is being used.
@@ -391,21 +393,12 @@ class InnerTube:
 
         headers.update(self.header)
 
-        retry = 5
-        while True:
-            try:
-                response = request._execute_request(
-                    endpoint_url,
-                    'POST',
-                    headers=headers,
-                    data=data
-                )
-                break
-            except urllib.error.URLError as e:
-                retry -= 1
-                if retry <= 0:
-                    raise e
-                logger.debug(f'Error calling API: {e}. Retrying...')
+        response = request._execute_request(
+            endpoint_url,
+            'POST',
+            headers=headers,
+            data=data
+        )
 
         return json.loads(response.read())
 
