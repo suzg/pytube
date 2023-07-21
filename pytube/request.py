@@ -1,6 +1,8 @@
 """Implements a simple wrapper around urlopen."""
 import http.client
 import json
+import time
+import urllib.error
 import logging
 import re
 import socket
@@ -34,7 +36,17 @@ def _execute_request(
         request = Request(url, headers=base_headers, method=method, data=data)
     else:
         raise ValueError("Invalid URL")
-    return urlopen(request, timeout=timeout)  # nosec
+    retry = 5
+    while True:
+        try:
+            return urlopen(request, timeout=timeout)  # nosec
+        except (http.client.HTTPException, urllib.error.URLError, socket.timeout) as e:
+            if retry > 0:
+                retry -= 1
+                logger.warning(f"Retry {retry} {url}")
+                time.sleep(10)
+                continue
+            raise e
 
 
 def get(url, extra_headers=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):

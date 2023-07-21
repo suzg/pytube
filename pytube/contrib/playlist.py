@@ -1,6 +1,7 @@
 """Module to download a complete playlist from a youtube channel."""
 import json
 import logging
+import urllib.error
 from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Dict, Iterable, List, Optional, Tuple, Union
@@ -139,7 +140,17 @@ class Playlist(Sequence):
             logger.debug("load more url: %s", load_more_url)
             # requesting the next page of videos with the url generated from the
             # previous page, needs to be a post
-            req = request.post(load_more_url, extra_headers=headers, data=data)
+            retry = 5
+            while True:
+                try:
+                    req = request.post(load_more_url, extra_headers=headers, data=data)
+                    break
+                except urllib.error.URLError as e:
+                    retry -= 1
+                    if retry == 0:
+                        raise e
+                    logger.debug("retrying request, %d attempts left", retry)
+                    
             # extract up to 100 songs from the page loaded
             # returns another continuation if more videos are available
             videos_urls, continuation = self._extract_videos(req)

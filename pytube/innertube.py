@@ -7,12 +7,16 @@ the useful information for the end user.
 # Native python imports
 import json
 import os
+import logging
 import pathlib
 import time
 from urllib import parse
+import urllib.error
 
 # Local imports
 from pytube import request
+
+logger = logging.getLogger(__name__)
 
 # YouTube on TV client secrets
 _client_id = '861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com'
@@ -387,12 +391,22 @@ class InnerTube:
 
         headers.update(self.header)
 
-        response = request._execute_request(
-            endpoint_url,
-            'POST',
-            headers=headers,
-            data=data
-        )
+        retry = 5
+        while True:
+            try:
+                response = request._execute_request(
+                    endpoint_url,
+                    'POST',
+                    headers=headers,
+                    data=data
+                )
+                break
+            except urllib.error.URLError as e:
+                retry -= 1
+                if retry <= 0:
+                    raise e
+                logger.debug(f'Error calling API: {e}. Retrying...')
+
         return json.loads(response.read())
 
     def browse(self):
